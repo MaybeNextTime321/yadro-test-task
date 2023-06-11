@@ -2,6 +2,7 @@
 #include <fstream>
 #include <vector>
 #include <unordered_map>
+#include <unordered_set>
 #include <string>
 #include <memory>
 
@@ -154,18 +155,25 @@ bool StringContainAnyOperation(std::string_view value)
 	return value.find('+') != std::string::npos || value.find('-') != std::string::npos || value.find('*') != std::string::npos || value.find('/') != std::string::npos;
 }
 
-void ReplaceValueToInfinite(std::shared_ptr<Cell> value)
-{
-	std::cout << "\tValue replased to \"inf\"" << std::endl;
+void ReplaceValueToInfinite(std::shared_ptr<Cell>& value, std::string error_message, bool display_error=true)
+{	
+	if(display_error)
+	{
+		std::cout<< error_message;
+		std::cout << "\tValue replased to \"inf\"" << std::endl;
+	}
+
 	value->current_cell_value = "inf";
 }
 
-bool ArgumentToResult(const std::string& text_view, const std::unordered_map<std::string, std::shared_ptr<Cell>>& cell_by_name, int &result)
+bool CalculateSingleValues(std::shared_ptr<Cell> value, const std::unordered_map<std::string, std::shared_ptr<Cell>>& cell_by_name, std::unordered_set<std::shared_ptr<Cell>>& reference_list);
+
+bool ArgumentToResult(const std::string& text_view, const std::unordered_map<std::string, std::shared_ptr<Cell>>& cell_by_name, int &result, std::unordered_set<std::shared_ptr<Cell>>& reference_list)
 {
 	std::unordered_map<std::string,std::shared_ptr<Cell>>::const_iterator cell = cell_by_name.find(text_view);
 	if ( cell == cell_by_name.end() && !StringIsNumber(text_view))
 	{
-		std::cout<< " Can't find element: " << text_view;  
+		std::cout<< "Can't find element: " << text_view << std::endl;  
 		return false;
 	}
 
@@ -183,29 +191,45 @@ bool ArgumentToResult(const std::string& text_view, const std::unordered_map<std
 		}
 		else 
 		{
-			std::cout << "Calculating in process... ";
-			return false;
+			//std::cout << "Start calculate new cell: " << cell->second->current_cell_value << std::endl;
+			if(CalculateSingleValues(cell->second,cell_by_name, reference_list))
+			{
+				result = cell->second->result;
+				return true;
+			}
+			else
+				return false;
+
 		}
 	}
 }
 
-bool CalculateSingleValues(std::shared_ptr<Cell> value, const std::unordered_map<std::string, std::shared_ptr<Cell>>& cell_by_name)
+bool CalculateSingleValues(std::shared_ptr<Cell> value, const std::unordered_map<std::string, std::shared_ptr<Cell>>& cell_by_name, std::unordered_set<std::shared_ptr<Cell>>& reference_list)
 {
-	std::string text_view = value->current_cell_value;
 	
+	std::string text_view = value->current_cell_value;
+
 	if(text_view[0] != '=')
 	{
-		std::cout << "Incorrect input " << text_view;
-		ReplaceValueToInfinite(value);
+		ReplaceValueToInfinite(value, "Incorrect input. Cell: " + value->cell_name + "\tValue: " + text_view, true);
 		return false;
 	}
+
+	if(reference_list.find(value) != reference_list.end())
+	{
+
+		ReplaceValueToInfinite(value,"Cell error: Circular Dependency Detected in Cell: " + value->cell_name, true);
+		return false;
+	}
+	else
+		reference_list.insert(value);
+
 
 	text_view.erase(0, 1);
 
 	if(!StringContainAnyOperation(text_view))
 	{
-		std::cout << "Cell doesn't containt any operator";
-		ReplaceValueToInfinite(value); 
+		ReplaceValueToInfinite(value, "Cell doesn't containt any operator"); 
 		return false;
 	}
 
@@ -231,15 +255,21 @@ bool CalculateSingleValues(std::shared_ptr<Cell> value, const std::unordered_map
 	int second_cell_number;
 
 
-	if(!ArgumentToResult(first_cell_name,cell_by_name,first_cell_number))
+	if(!ArgumentToResult(first_cell_name,cell_by_name,first_cell_number,reference_list))
 	{
-		ReplaceValueToInfinite(value);
+		if(reference_list.find(value) == reference_list.end())
+			ReplaceValueToInfinite(value,"Can't get first argument " + first_cell_name,true);
+		else
+			ReplaceValueToInfinite(value,"",false);
 		return false;
 	}
 
-	if(!ArgumentToResult(second_cell_name,cell_by_name,second_cell_number))
+	if(!ArgumentToResult(second_cell_name,cell_by_name,second_cell_number,reference_list))
 	{
-		ReplaceValueToInfinite(value);
+		if(reference_list.find(value) == reference_list.end())
+			ReplaceValueToInfinite(value,"Can't get second argument " + second_cell_name,true);
+		else
+			ReplaceValueToInfinite(value,"",false);
 		return false;
 	}
 
@@ -265,12 +295,11 @@ bool CalculateSingleValues(std::shared_ptr<Cell> value, const std::unordered_map
 	{
 		if(second_cell_number == 0)
 		{
-			std::cout << "Division by 0 is not possible";
-			ReplaceValueToInfinite(value);
+			ReplaceValueToInfinite(value,"Division by 0 is not possible",true);
 			return false;
 		}
 
-		value->result = first_cell_number / second_cell_number;
+		value->result = (float)first_cell_number / second_cell_number;
 		value->result_is_ready = true;
 	}
 
@@ -280,10 +309,13 @@ bool CalculateSingleValues(std::shared_ptr<Cell> value, const std::unordered_map
 bool CalculateValues(std::vector<std::shared_ptr<Cell>>calculated_cell, std::unordered_map<std::string, std::shared_ptr<Cell>> cell_by_name)
 {
 	bool all_values_calculated = true;
-	
+
+	std::unordered_set<std::shared_ptr<Cell>>reference_list;
+
 	for(std::shared_ptr<Cell> single_cell: calculated_cell)
 	{
-		if(!CalculateSingleValues(single_cell,cell_by_name))
+		reference_list.clear();
+		if(!CalculateSingleValues(single_cell,cell_by_name, reference_list))
 			all_values_calculated = false;
 	}
 
@@ -348,9 +380,12 @@ int main(int argc, char* argv[])
 			AddCell(row,cell_by_name,cell_by_index,column_name,row_name,column_counter,row_counter,single_item,calculated_cell);
 		}
 	}
-	
-	std::cout << std::endl;
-	CalculateValues(calculated_cell,cell_by_name);
+
+	if(!CalculateValues(calculated_cell,cell_by_name))
+	{
+		std::cout << "One or more cells cannot be calculated. The value has been replaced with inf" << std::endl;
+	}
+
 	PrintValues(row_name, column_name, cell_by_index);
 	std::cout << std::endl;
 	return 0;

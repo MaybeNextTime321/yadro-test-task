@@ -300,13 +300,13 @@ bool CalculateSingleValues(std::shared_ptr<Cell> value, const std::unordered_map
 		if(reference_list.find(value) == reference_list.end())
 		{
 			ReplaceValueToInfinite(value,"Can't get first argument " + first_cell_name,true);
-			return false;
+			
 		}
 		else
 		{
 			ReplaceValueToInfinite(value,"",false);
-			return true;
 		}
+		return false;
 		
 	}
 
@@ -315,13 +315,12 @@ bool CalculateSingleValues(std::shared_ptr<Cell> value, const std::unordered_map
 		if(reference_list.find(value) == reference_list.end())
 		{
 			ReplaceValueToInfinite(value,"Can't get second argument " + second_cell_name,true);
-			return false;
 		}
 		else
 		{
 			ReplaceValueToInfinite(value,"",false);
-			return true;
 		}
+		return false;
 		
 	}
 

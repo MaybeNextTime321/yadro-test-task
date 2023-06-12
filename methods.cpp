@@ -300,12 +300,14 @@ bool CalculateSingleValues(std::shared_ptr<Cell> value, const std::unordered_map
 		if(reference_list.find(value) == reference_list.end())
 		{
 			ReplaceValueToInfinite(value,"Can't get first argument " + first_cell_name,true);
+			return false;
 		}
 		else
 		{
 			ReplaceValueToInfinite(value,"",false);
+			return true;
 		}
-		return false;
+		
 	}
 
 	if(!ArgumentToResult(second_cell_name,cell_by_name,second_cell_number,reference_list))
@@ -313,12 +315,14 @@ bool CalculateSingleValues(std::shared_ptr<Cell> value, const std::unordered_map
 		if(reference_list.find(value) == reference_list.end())
 		{
 			ReplaceValueToInfinite(value,"Can't get second argument " + second_cell_name,true);
+			return false;
 		}
 		else
 		{
 			ReplaceValueToInfinite(value,"",false);
+			return true;
 		}
-		return false;
+		
 	}
 
 	if(operation == '+')
@@ -363,7 +367,7 @@ bool CalculateValues(std::vector<std::shared_ptr<Cell>>calculated_cell, std::uno
 	for(std::shared_ptr<Cell> single_cell: calculated_cell)
 	{
 		reference_list.clear();
-		if(!CalculateSingleValues(single_cell,cell_by_name, reference_list))
+		if(!CalculateSingleValues(single_cell,cell_by_name, reference_list) && single_cell->current_cell_value != "")
 		{
 			all_values_calculated = false;
 		}
